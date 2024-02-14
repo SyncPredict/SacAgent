@@ -16,11 +16,12 @@ replay_buffer = ReplayBuffer(replay_buffer_size)
 hidden_state_dim = 256
 batch_size = 256
 window_size = 288
-agent = Agent(window_size, 2, hidden_state_dim, replay_buffer, batch_size)
+agent = Agent(window_size, 1, hidden_state_dim)
+
 model_path = find_directory()
-agent.load_model(model_path)
+# agent.agent.load_model(model_path)
 print(f'Loaded: {model_path}')
 env = TradingEnv(processor, window_size)
 agent.execute_episodes(env, 10000, True)
 
-agent.save_model('sac_model', 3)
+agent.agent.save_model('sac_model', 3)

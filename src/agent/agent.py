@@ -1,47 +1,36 @@
 import json
-
 import numpy as np
 import gc  # Импортируем модуль сборщика мусора
-
-from src.agent.sac import SACAgent
 import wandb
 import os
 
 from src.utils.dir import find_directory
 from src.utils.visualize import print_progress
+from src.agent.dqn import DQNAgent  # Предполагается, что dqn.py находится в src/agent
 
-
-class Agent(SACAgent):
-
-    def __init__(self, state_dim, action_dim, hidden_dim, replay_buffer, batch_size, lr=3e-4, gamma=0.99, tau=0.005,
-                 alpha=0.2):
-        super().__init__(state_dim, action_dim, hidden_dim, lr, gamma, tau, alpha)
-        self.replay_buffer = replay_buffer
-        self.batch_size = batch_size
+class Agent:
+    def __init__(self, state_dim, action_dim, hidden_dim, lr=3e-4, gamma=0.99, replay_buffer_size=10000, batch_size=64):
+        self.agent = DQNAgent(state_dim, action_dim, hidden_dim, lr=lr, gamma=gamma, replay_buffer_size=replay_buffer_size, batch_size=batch_size)
 
     def execute_episodes(self, env, episodes=20, train=False):
         new_dir = find_directory(True)
         for episode in range(episodes):
             rewards, actions, dates = self._process_episode(env, episode, episodes, train)
             total_rewards = sum(rewards)  # Общая награда за эпизод
-            average_reward_per_step = total_rewards / len(
-                rewards) if rewards else 0  # Средняя награда за шаг, предотвращаем деление на 0
-            positive_rewards_count = len([r for r in rewards if r > 0])  # Количество положительных наград
-            win_rate = (positive_rewards_count / len(
-                rewards) * 100) if rewards else 0  # Процент положительных наград, предотвращаем деление на 0
+            average_reward_per_step = total_rewards / len(rewards) if rewards else 0
+            positive_rewards_count = len([r for r in rewards if r > 0])
+            win_rate = (positive_rewards_count / len(rewards) * 100) if rewards else 0
 
-            # Логирование метрик
             wandb.log({
                 'Episode total rewards': total_rewards,
                 'Average reward per step': average_reward_per_step,
                 'Win rate (%)': win_rate,
-                'Rewards distribution': wandb.Histogram(rewards)  # Гистограмма распределения наград за шаги
+                'Rewards distribution': wandb.Histogram(rewards)
             })
 
             if train:
-                self.update_parameters(self.replay_buffer, self.batch_size)
-                self.replay_buffer.reset()
-                self.save_model(new_dir, f'episode_{episode}')
+                self.agent.replay()  # Обновление сети DQN из буфера воспроизведения
+                self.agent.save_model(os.path.join(new_dir, f'episode_{episode}.pth'))
 
             gc.collect()
 
@@ -50,10 +39,10 @@ class Agent(SACAgent):
         state = env.reset()
         max_timesteps = len(env)
         for timestep in range(max_timesteps):
-            action = self.select_action(state)
+            action = self.agent.select_action(state)
             next_state, reward, done, date = env.step(action)
             if not np.isnan(reward):
-                self.replay_buffer.add((state, action, next_state, reward, float(done)))  # Добавление в буфер
+                self.agent.add_to_replay_buffer(state, action, reward, next_state, float(done))
                 actions.append(action)
                 rewards.append(reward)
                 dates.append(date)

@@ -3,6 +3,8 @@ from gym import spaces
 import numpy as np
 
 
+STATIC_STOP_LOSS = -0.02  # -2%
+STATIC_TAKE_PROFIT = 0.03  # +3%
 class TradingEnv(gym.Env):
     """Оптимизированная среда для торговли фьючерсами Bitcoin."""
 
@@ -12,11 +14,7 @@ class TradingEnv(gym.Env):
         self.current_step = None
         self.data_processor = data_processor
         self.window_size = window_size
-        self.action_space = spaces.Box(
-            low=np.array([0, 0], dtype=np.float32),  # Изменено на нижний предел
-            high=np.array([1, 1], dtype=np.float32),
-            dtype=np.float32
-        )
+        self.action_space = spaces.Discrete(2)  # 0: не торговать, 1: торговать
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(window_size,),
                                             dtype=np.float32)  # Изменен shape
         self.reset()
@@ -34,13 +32,16 @@ class TradingEnv(gym.Env):
         return obs  # Возвращается уже в обработанном виде
 
     def _take_action(self, action, current_price):
-        stop_loss, take_profit = action  # Использование нового метода
-        # Пересчет цен не требуется, используем функцию check_stop_loss_take_profit
-        result_price = self.data_processor.execute_trading_decision(self.current_step, stop_loss, take_profit)
-        if result_price == -10000:
-            return float('nan')
-        percentage_change = (result_price - current_price) / current_price
-        return percentage_change
+        if action == 1:  # Торговать
+            stop_loss = STATIC_STOP_LOSS
+            take_profit = STATIC_TAKE_PROFIT
+            result_price = self.data_processor.execute_trading_decision(self.current_step, stop_loss, take_profit)
+            if result_price == -10000:
+                return float('nan')  # или другое значение, обозначающее неудачную торговлю
+            percentage_change = (result_price - current_price) / current_price
+            return percentage_change
+        else:
+            return 0  # Нет изменения (нет торговли)
 
     def step(self, action):
         current_price = self.data_processor.get_price(self.current_step)
