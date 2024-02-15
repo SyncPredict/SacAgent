@@ -43,16 +43,15 @@ class SACAgent:
         with torch.no_grad():
             next_actions, next_log_pi = self.actor.sample(next_states)
             q_target_next_1, q_target_next_2 = self.critic_networks.target_predict(next_states, next_actions)
-            min_q_target_next_1 = q_target_next_1 - self.alpha * next_log_pi
-            min_q_target_next_2 = q_target_next_2 - self.alpha * next_log_pi
-            q_target_1 = rewards + self.gamma * (1 - dones) * min_q_target_next_1
-            q_target_2 = rewards + self.gamma * (1 - dones) * min_q_target_next_2
+            min_q_target_next = torch.min(q_target_next_1, q_target_next_2) - self.alpha * next_log_pi
+            q_target = rewards + self.gamma * (1 - dones) * min_q_target_next
 
         current_q1, current_q2 = self.critic_networks.predict(states, actions)
 
         # Вычисление потерь отдельно для каждого критика
-        critic_loss_1 = F.mse_loss(current_q1, q_target_1)
-        critic_loss_2 = F.mse_loss(current_q2, q_target_2)
+        critic_loss_1 = F.mse_loss(current_q1, q_target)
+        critic_loss_2 = F.mse_loss(current_q2, q_target)
+
 
         self.critic_networks.optimizer_1.zero_grad()
         critic_loss_1.backward()

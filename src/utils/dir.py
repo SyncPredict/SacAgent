@@ -2,7 +2,7 @@ import os
 
 
 def find_directory(create_new=False, base_directory="./models"):
-    number = 1  # Начинаем с run_1
+    number = 0  # Начинаем с run_1
     last_existing_dir = None
 
     while True:

@@ -13,7 +13,7 @@ from src.utils.visualize import print_progress
 
 class Agent(SACAgent):
 
-    def __init__(self, state_dim, action_dim, hidden_dim, replay_buffer, batch_size, lr=3e-4, gamma=0.99, tau=0.005,
+    def __init__(self, state_dim, action_dim, hidden_dim, replay_buffer, batch_size, lr=1e-4, gamma=0.99, tau=0.005,
                  alpha=0.2):
         super().__init__(state_dim, action_dim, hidden_dim, lr, gamma, tau, alpha)
         self.replay_buffer = replay_buffer
@@ -35,7 +35,7 @@ class Agent(SACAgent):
                 'Episode total rewards': total_rewards,
                 'Average reward per step': average_reward_per_step,
                 'Win rate (%)': win_rate,
-                'Rewards distribution': wandb.Histogram(rewards)  # Гистограмма распределения наград за шаги
+                    'Rewards distribution': wandb.Table(rewards)  # Гистограмма распределения наград за шаги
             })
 
             if train:
