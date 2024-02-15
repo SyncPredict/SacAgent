@@ -12,12 +12,13 @@ processor = DataProcessor('test_data.json')
 
 replay_buffer_size = 105120  # Размер буффера
 replay_buffer = ReplayBuffer(replay_buffer_size)
-hidden_state_dim = 256
-batch_size = 256
+hidden_state_dim = 1440
+batch_size = 1440
 window_size = 288
 agent = Agent(window_size, 2, hidden_state_dim, replay_buffer, batch_size)
 model_path = find_directory()
-agent.load_model(model_path)
+print(model_path)
+agent.load_model('./models/run_2/episode_108.pth')
 
 results = []  # Список для хранения результатов
 
