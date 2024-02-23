@@ -14,8 +14,32 @@ from ..utils.dir import find_directory
 
 
 class SACAgent:
+    """
+    Агент, использующий алгоритм Soft Actor-Critic (SAC) для обучения политики в заданной среде.
+
+    Атрибуты:
+        actor (Actor): Нейронная сеть, определяющая политику действий агента.
+        critic_networks (CriticNetworks): Две критические сети (Q-сети) и две целевые критические сети для оценки действий.
+        actor_optimizer (torch.optim.Adam): Оптимизатор для обновления весов сети актора.
+        gamma (float): Коэффициент дисконтирования будущих наград.
+        tau (float): Коэффициент для мягкого обновления весов целевых сетей.
+        alpha (float): Коэффициент, определяющий важность энтропийного бонуса.
+        device (torch.device): Устройство, на котором выполняются вычисления (CPU или GPU).
+    """
     def __init__(self, state_dim, action_dim, hidden_dim, lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2):
-        self.actor = Actor(state_dim, action_dim, hidden_dim)
+        """
+        Инициализация агента SAC с заданными параметрами сети и обучения.
+
+        Параметры:
+            state_dim (int): Размерность пространства состояний среды.
+            action_dim (int): Размерность пространства действий агента.
+            hidden_dim (int): Размер скрытых слоёв нейронной сети.
+            lr (float): Скорость обучения для оптимизатора.
+            gamma (float): Коэффициент дисконтирования будущих наград.
+            tau (float): Коэффициент мягкого обновления целевых сетей.
+            alpha (float): Коэффициент, определяющий важность энтропийного бонуса.
+        """
+        self.actor = Actor(state_dim, action_dim, hidden_dim, 4)
         self.critic_networks = CriticNetworks(state_dim, action_dim, hidden_dim)
 
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
@@ -25,12 +49,41 @@ class SACAgent:
         self.device = torch.device("cpu")
 
     def select_action(self, state):
+        """
+        Выбор действия агентом для заданного состояния.
+
+        Параметры:
+            state (np.ndarray): Входной массив состояний размерности (seq_length, ),
+                                где seq_length - длина последовательности, features - количество признаков состояния (здесь 1 так как используем только цену).
+        Возвращает:
+            action (np.ndarray): Выбранное действие в формате numpy массива.
+                                 Формат: (action_dim,)
+
+        Пример:
+            state = [0.1, 0.2, 0.3]
+            action = agent.select_action(state)  # Например, np.array([0.5, -0.1])
+        """
         with torch.no_grad():
-            state = torch.FloatTensor(state).unsqueeze(0)
-            action, _ = self.actor.sample(state)
-        return action.cpu().numpy()[0]
+            state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(-1).to(self.device)
+            action, _ = self.actor.sample(state)  # action имеет форму [1, action_dim]
+            action = action.squeeze(0)  # Убираем измерение batch, получаем [action_dim]
+        return action.cpu().numpy()
 
     def update_parameters(self, replay_buffer, batch_size):
+        """
+        Обновление параметров политики и Q-функций на основе мини-батча из буфера воспроизведения.
+
+        Параметры:
+            replay_buffer (ReplayBuffer): Буфер воспроизведения для выборки опыта.
+            batch_size (int): Размер мини-батча для обновления.
+
+        Формат входных данных:
+            - states: torch.Tensor, формат (batch_size, state_dim)
+            - actions: torch.Tensor, формат (batch_size, action_dim)
+            - rewards: torch.Tensor, формат (batch_size, 1)
+            - next_states: torch.Tensor, формат (batch_size, state_dim)
+            - dones: torch.Tensor, формат (batch_size, 1)
+        """
         states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
 
         states = torch.as_tensor(states, dtype=torch.float32, device=self.device)
@@ -51,7 +104,6 @@ class SACAgent:
         # Вычисление потерь отдельно для каждого критика
         critic_loss_1 = F.mse_loss(current_q1, q_target)
         critic_loss_2 = F.mse_loss(current_q2, q_target)
-
 
         self.critic_networks.optimizer_1.zero_grad()
         critic_loss_1.backward()
@@ -75,10 +127,14 @@ class SACAgent:
         # Soft update целевых сетей
         self.critic_networks.update_targets(self.tau)
 
-    def save_model(self,new_dir, name):
-        # Гарантируем наличие директории
+    def save_model(self, new_dir, name):
+        """
+        Сохраняет модель агента в указанной директории.
 
-
+        Параметры:
+            new_dir (str): Путь к директории для сохранения модели.
+            name (str): Имя файла для сохранения состояния модели.
+        """
         # Обновляем путь для сохранения, используя имя файла
         save_path = os.path.join(new_dir, f'{name}.pth')
 
@@ -92,6 +148,13 @@ class SACAgent:
         }, save_path)
 
     def load_model(self, path, device='cpu'):
+        """
+        Загружает модель агента из файла.
+
+        Параметры:
+            path (str): Путь к файлу с сохраненной моделью.
+            device (str): Устройство, на которое будет загружена модель ('cpu' или 'cuda').
+        """
         checkpoint = torch.load(path, map_location=device)
         self.actor.load_state_dict(checkpoint['actor_state_dict'])
         self.critic_networks.load_state_dict(checkpoint['critic_networks_state_dict'])
