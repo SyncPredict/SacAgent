@@ -1,3 +1,4 @@
+import torch
 import wandb
 import json
 
@@ -18,7 +19,8 @@ window_size = 288
 agent = Agent(window_size, 2, hidden_state_dim, replay_buffer, batch_size)
 model_path = find_directory()
 print(model_path)
-agent.load_model('./models/run_2/episode_108.pth')
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+agent.load_model('./models/run_2/episode_108.pth', device=device)
 
 results = []  # Список для хранения результатов
 

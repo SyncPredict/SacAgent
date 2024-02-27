@@ -19,12 +19,14 @@ class MultiHeadAttention(nn.Module):
             self.head_dim * num_heads == hidden_dim
         ), "hidden_dim must be divisible by num_heads"
 
-        self.query = nn.Linear(hidden_dim, hidden_dim)
-        self.key = nn.Linear(hidden_dim, hidden_dim)
-        self.value = nn.Linear(hidden_dim, hidden_dim)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.softmax = nn.Softmax(dim=-1)
-        self.fc_out = nn.Linear(hidden_dim, hidden_dim)
+        self.query = nn.Linear(hidden_dim, hidden_dim, device=self.device)
+        self.key = nn.Linear(hidden_dim, hidden_dim, device=self.device)
+        self.value = nn.Linear(hidden_dim, hidden_dim, device=self.device)
+
+        self.softmax = nn.Softmax(dim=-1).to(self.device)
+        self.fc_out = nn.Linear(hidden_dim, hidden_dim, device=self.device)
 
     def forward(self, x):
         """
@@ -88,14 +90,14 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         self.device = device
         self.lstm = nn.LSTM(
-            input_size=state_dim, hidden_size=hidden_dim, batch_first=True
-        ).to(self.device)
-        self.attention = MultiHeadAttention(hidden_dim, num_heads)
-        self.layer_norm1 = nn.LayerNorm(hidden_dim)
-        self.fc1 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer_norm2 = nn.LayerNorm(hidden_dim)
-        self.mean_layer = nn.Linear(hidden_dim, action_dim)
-        self.log_std_layer = nn.Linear(hidden_dim, action_dim)
+            input_size=state_dim, hidden_size=hidden_dim, batch_first=True, device=self.device
+        )
+        self.attention = MultiHeadAttention(hidden_dim, num_heads).to(self.device)
+        self.layer_norm1 = nn.LayerNorm(hidden_dim, device=self.device)
+        self.fc1 = nn.Linear(hidden_dim, hidden_dim, device=self.device)
+        self.layer_norm2 = nn.LayerNorm(hidden_dim, device=self.device)
+        self.mean_layer = nn.Linear(hidden_dim, action_dim, device=self.device)
+        self.log_std_layer = nn.Linear(hidden_dim, action_dim, device=self.device)
         self.max_action = 1.0
 
     def forward(self, state):

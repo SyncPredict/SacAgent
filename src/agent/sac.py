@@ -50,7 +50,11 @@ class SACAgent:
             tau (float): Коэффициент мягкого обновления целевых сетей.
             alpha (float): Коэффициент, определяющий важность энтропийного бонуса.
         """
-        self.device = torch.device("gpu" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # Устанавливаем устройство по умолчанию для PyTorch
+        torch.set_default_device(self.device)
+
         self.actor = Actor(state_dim, action_dim, hidden_dim, num_heads, self.device)
         self.critic_networks = CriticNetworks(state_dim, action_dim, hidden_dim)
 
@@ -75,8 +79,8 @@ class SACAgent:
             action = agent.select_action(state)  # Например, np.array([0.5, -0.1])
         """
         with torch.no_grad():
-            state = torch.FloatTensor(state).to(self.device)
-            action, _ = self.actor.sample(state)  # action имеет форму [1, action_dim]
+            state = torch.tensor(state, device=self.device, dtype=torch.float)
+            action, _ = self.actor.sample(state)  # action имеет форму [batch_size, action_dim]
             action = action.squeeze(0)  # Убираем измерение batch, получаем [action_dim]
         return action.cpu().numpy()
 
@@ -96,11 +100,11 @@ class SACAgent:
             - dones: torch.Tensor, формат (batch_size, 1)
         """
         states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.FloatTensor(actions).to(self.device)
-        rewards = torch.FloatTensor(rewards).to(self.device).unsqueeze(-1)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        dones = torch.FloatTensor(dones).to(self.device).unsqueeze(-1)
+        states = torch.FloatTensor(states, device=self.device)
+        actions = torch.FloatTensor(actions, device=self.device)
+        rewards = torch.FloatTensor(rewards, device=self.device).unsqueeze(-1)
+        next_states = torch.FloatTensor(next_states, device=self.device)
+        dones = torch.FloatTensor(dones, device=self.device).unsqueeze(-1)
 
         # Обновление Critic
         with torch.no_grad():

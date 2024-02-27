@@ -2,6 +2,7 @@ import numpy as np
 import gc  # Импортируем модуль сборщика мусора
 
 import pandas as pd
+import torch
 
 from src.agent.sac import SACAgent, clear_memory
 import wandb
@@ -120,7 +121,7 @@ class Agent(SACAgent):
         state = env.reset()
         max_timesteps = len(env)
         for timestep in range(max_timesteps):
-            state_with_batch = state[np.newaxis, :, :]
+            state_with_batch = torch.from_numpy(state[np.newaxis, :, :]).float().to(self.device)
             action = self.select_action(state_with_batch)
             next_state, reward, done, date = env.step(action)
             if not np.isnan(reward) and train:
