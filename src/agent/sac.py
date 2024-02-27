@@ -27,7 +27,17 @@ class SACAgent:
         device (torch.device): Устройство, на котором выполняются вычисления (CPU или GPU).
     """
 
-    def __init__(self, state_dim, action_dim, hidden_dim, lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2, num_heads=4):
+    def __init__(
+        self,
+        state_dim,
+        action_dim,
+        hidden_dim,
+        lr=3e-4,
+        gamma=0.99,
+        tau=0.005,
+        alpha=0.2,
+        num_heads=4,
+    ):
         """
         Инициализация агента SAC с заданными параметрами сети и обучения.
 
@@ -95,8 +105,12 @@ class SACAgent:
         # Обновление Critic
         with torch.no_grad():
             next_actions, next_log_pi = self.actor.sample(next_states)
-            q_target_next_1, q_target_next_2 = self.critic_networks.target_predict(next_states, next_actions)
-            min_q_target_next = torch.min(q_target_next_1, q_target_next_2) - self.alpha * next_log_pi
+            q_target_next_1, q_target_next_2 = self.critic_networks.target_predict(
+                next_states, next_actions
+            )
+            min_q_target_next = (
+                torch.min(q_target_next_1, q_target_next_2) - self.alpha * next_log_pi
+            )
             q_target = rewards + self.gamma * (1 - dones) * min_q_target_next
 
         current_q1, current_q2 = self.critic_networks.predict(states, actions)
@@ -136,18 +150,21 @@ class SACAgent:
             name (str): Имя файла для сохранения состояния модели.
         """
         # Обновляем путь для сохранения, используя имя файла
-        save_path = os.path.join(new_dir, f'{name}.pth')
+        save_path = os.path.join(new_dir, f"{name}.pth")
 
         # Сохраняем состояние модели
-        torch.save({
-            'actor_state_dict': self.actor.state_dict(),
-            'critic_networks_state_dict': self.critic_networks.state_dict(),
-            'actor_optimizer_state_dict': self.actor_optimizer.state_dict(),
-            'critic_networks_optimizer_1_state_dict': self.critic_networks.optimizer_1.state_dict(),
-            'critic_networks_optimizer_2_state_dict': self.critic_networks.optimizer_2.state_dict()
-        }, save_path)
+        torch.save(
+            {
+                "actor_state_dict": self.actor.state_dict(),
+                "critic_networks_state_dict": self.critic_networks.state_dict(),
+                "actor_optimizer_state_dict": self.actor_optimizer.state_dict(),
+                "critic_networks_optimizer_1_state_dict": self.critic_networks.optimizer_1.state_dict(),
+                "critic_networks_optimizer_2_state_dict": self.critic_networks.optimizer_2.state_dict(),
+            },
+            save_path,
+        )
 
-    def load_model(self, path, device='cpu'):
+    def load_model(self, path, device="cpu"):
         """
         Загружает модель агента из файла.
 
@@ -156,8 +173,12 @@ class SACAgent:
             device (str): Устройство, на которое будет загружена модель ('cpu' или 'cuda').
         """
         checkpoint = torch.load(path, map_location=device)
-        self.actor.load_state_dict(checkpoint['actor_state_dict'])
-        self.critic_networks.load_state_dict(checkpoint['critic_networks_state_dict'])
-        self.actor_optimizer.load_state_dict(checkpoint['actor_optimizer_state_dict'])
-        self.critic_networks.optimizer_1.load_state_dict(checkpoint['critic_networks_optimizer_1_state_dict'])
-        self.critic_networks.optimizer_2.load_state_dict(checkpoint['critic_networks_optimizer_2_state_dict'])
+        self.actor.load_state_dict(checkpoint["actor_state_dict"])
+        self.critic_networks.load_state_dict(checkpoint["critic_networks_state_dict"])
+        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer_state_dict"])
+        self.critic_networks.optimizer_1.load_state_dict(
+            checkpoint["critic_networks_optimizer_1_state_dict"]
+        )
+        self.critic_networks.optimizer_2.load_state_dict(
+            checkpoint["critic_networks_optimizer_2_state_dict"]
+        )

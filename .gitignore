@@ -1,0 +1,6 @@
+__pycache__
+.conda
+.vscode
+.idea
+wandb
+models

@@ -2,6 +2,8 @@ import gym
 from gym import spaces
 import numpy as np
 
+from src.data.data_processor import DataProcessor
+
 
 class TradingEnv(gym.Env):
     """
@@ -17,7 +19,7 @@ class TradingEnv(gym.Env):
         current_step (int): Текущий шаг в рамках эпизода.
     """
 
-    def __init__(self, data_processor, window_size=288):
+    def __init__(self, data_processor: DataProcessor, window_size=288):
         """
         Инициализирует среду торговли фьючерсами Bitcoin.
 
@@ -32,10 +34,11 @@ class TradingEnv(gym.Env):
         self.action_space = spaces.Box(
             low=np.array([0, 0], dtype=np.float32),
             high=np.array([1, 1], dtype=np.float32),
-            dtype=np.float32
+            dtype=np.float32,
         )
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(window_size,),
-                                            dtype=np.float32)
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(window_size,), dtype=np.float32
+        )
         self.reset()
 
     def __len__(self):
@@ -64,7 +67,9 @@ class TradingEnv(gym.Env):
                  Пример возвращаемого значения для window_size=3: np.array([0.1, -0.0909, 0.0333]), где каждое значение отражает изменение
                  цены относительно предыдущего значения в последовательности.
         """
-        obs = self.data_processor.get_episode_data(self.current_step - self.window_size, self.current_step)
+        obs = self.data_processor.get_episode_data(
+            self.current_step - self.window_size, self.current_step
+        )
         return obs
 
     def _take_action(self, action, current_price):
@@ -79,9 +84,11 @@ class TradingEnv(gym.Env):
                  Возвращает NaN, если условия не были достигнуты.
         """
         stop_loss, take_profit = action
-        result_price = self.data_processor.execute_trading_decision(self.current_step, stop_loss, take_profit)
+        result_price = self.data_processor.execute_trading_decision(
+            self.current_step, stop_loss, take_profit
+        )
         if result_price == -10000:
-            return float('nan')
+            return float("nan")
         percentage_change = (result_price - current_price) / current_price
         return percentage_change
 
