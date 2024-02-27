@@ -46,8 +46,8 @@ class CriticNetworks:
         self.target_critic_2.load_state_dict(self.critic_2.state_dict())
 
         # Определение оптимизаторов для каждого критика
-        self.optimizer_1 = torch.optim.Adam(self.critic_1.parameters())
-        self.optimizer_2 = torch.optim.Adam(self.critic_2.parameters())
+        self.optimizer_1 = torch.optim.AdamW(self.critic_1.parameters())
+        self.optimizer_2 = torch.optim.AdamW(self.critic_2.parameters())
 
     def predict(self, states, actions):
         """

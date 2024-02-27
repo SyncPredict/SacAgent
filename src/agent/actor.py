@@ -68,9 +68,10 @@ class Actor(nn.Module):
         sample(state): Генерирует действие из нормального распределения, заданного параметрами, полученными из forward.
     """
 
-    def __init__(self, state_dim, action_dim, hidden_dim, num_heads):
+    def __init__(self, state_dim, action_dim, hidden_dim, num_heads,device):
         super(Actor, self).__init__()
-        self.lstm = nn.LSTM(input_size=state_dim, hidden_size=hidden_dim, batch_first=True)
+        self.device = device
+        self.lstm = nn.LSTM(input_size=state_dim, hidden_size=hidden_dim, batch_first=True).to(self.device)
         self.attention = MultiHeadAttention(hidden_dim, num_heads)
         self.layer_norm1 = nn.LayerNorm(hidden_dim)
         self.fc1 = nn.Linear(hidden_dim, hidden_dim)

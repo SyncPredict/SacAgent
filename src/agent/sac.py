@@ -9,8 +9,8 @@ from .critic import CriticNetworks
 from ..utils.dir import find_directory
 
 
-# def clear_memory():
-#     torch.cuda.empty_cache()
+def clear_memory():
+    torch.cuda.empty_cache()
 
 
 class SACAgent:
@@ -20,13 +20,14 @@ class SACAgent:
     Атрибуты:
         actor (Actor): Нейронная сеть, определяющая политику действий агента.
         critic_networks (CriticNetworks): Две критические сети (Q-сети) и две целевые критические сети для оценки действий.
-        actor_optimizer (torch.optim.Adam): Оптимизатор для обновления весов сети актора.
+        actor_optimizer (torch.optim.AdamW): Оптимизатор для обновления весов сети актора.
         gamma (float): Коэффициент дисконтирования будущих наград.
         tau (float): Коэффициент для мягкого обновления весов целевых сетей.
         alpha (float): Коэффициент, определяющий важность энтропийного бонуса.
         device (torch.device): Устройство, на котором выполняются вычисления (CPU или GPU).
     """
-    def __init__(self, state_dim, action_dim, hidden_dim, lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2):
+
+    def __init__(self, state_dim, action_dim, hidden_dim, lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2, num_heads=4):
         """
         Инициализация агента SAC с заданными параметрами сети и обучения.
 
@@ -39,14 +40,14 @@ class SACAgent:
             tau (float): Коэффициент мягкого обновления целевых сетей.
             alpha (float): Коэффициент, определяющий важность энтропийного бонуса.
         """
-        self.actor = Actor(state_dim, action_dim, hidden_dim, 4)
+        self.device = torch.device("cpu")
+        self.actor = Actor(state_dim, action_dim, hidden_dim, num_heads, self.device)
         self.critic_networks = CriticNetworks(state_dim, action_dim, hidden_dim)
 
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
+        self.actor_optimizer = optim.AdamW(self.actor.parameters(), lr=lr)
         self.gamma = gamma
         self.tau = tau
         self.alpha = alpha
-        self.device = torch.device("cpu")
 
     def select_action(self, state):
         """

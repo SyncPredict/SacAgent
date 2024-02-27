@@ -3,7 +3,7 @@ import gc  # Импортируем модуль сборщика мусора
 
 import pandas as pd
 
-from src.agent.sac import SACAgent
+from src.agent.sac import SACAgent, clear_memory
 import wandb
 
 from src.utils.dir import find_directory
@@ -75,6 +75,7 @@ class Agent(SACAgent):
                 self.replay_buffer.reset()
                 self.save_model(new_dir, f'episode_{episode}')
 
+            clear_memory()
             gc.collect()
 
     def _process_episode(self, env, episode, episodes, train):
