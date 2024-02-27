@@ -50,7 +50,7 @@ class SACAgent:
             tau (float): Коэффициент мягкого обновления целевых сетей.
             alpha (float): Коэффициент, определяющий важность энтропийного бонуса.
         """
-        self.device = torch.device("cpu")
+        self.device = torch.device("gpu" if torch.cuda.is_available() else "cpu")
         self.actor = Actor(state_dim, action_dim, hidden_dim, num_heads, self.device)
         self.critic_networks = CriticNetworks(state_dim, action_dim, hidden_dim)
 
