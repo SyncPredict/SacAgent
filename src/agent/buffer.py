@@ -16,7 +16,7 @@ class ReplayBuffer:
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
         states, actions, next_states, rewards, dones = map(np.stack, zip(*batch))
-        return  states, actions, rewards, next_states, dones
+        return states, actions, rewards, next_states, dones
 
     def __len__(self):
         return len(self.buffer)

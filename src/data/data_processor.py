@@ -48,7 +48,8 @@ class DataProcessor:
         """
         if start_index > 0:
             episode_rates = self.df.iloc[start_index - 1:end_index]['rate']
-            processed_episode = episode_rates.pct_change().dropna().to_numpy()  # Рассчитываем процентное изменение и удаляем NaN
+            processed_episode = episode_rates.pct_change().dropna().to_numpy()
+            processed_episode = np.expand_dims(processed_episode, axis=-1)  # Изменение формы массива
             return processed_episode
         else:
             raise ValueError("start_index должен быть больше 0")

@@ -64,7 +64,7 @@ class SACAgent:
             action = agent.select_action(state)  # Например, np.array([0.5, -0.1])
         """
         with torch.no_grad():
-            state = torch.FloatTensor(state).unsqueeze(0).unsqueeze(-1).to(self.device)
+            state = torch.FloatTensor(state).to(self.device)
             action, _ = self.actor.sample(state)  # action имеет форму [1, action_dim]
             action = action.squeeze(0)  # Убираем измерение batch, получаем [action_dim]
         return action.cpu().numpy()
@@ -85,12 +85,11 @@ class SACAgent:
             - dones: torch.Tensor, формат (batch_size, 1)
         """
         states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
-
-        states = torch.as_tensor(states, dtype=torch.float32, device=self.device)
-        actions = torch.as_tensor(actions, dtype=torch.float32, device=self.device)
-        rewards = torch.as_tensor(rewards, dtype=torch.float32, device=self.device).unsqueeze(-1)
-        next_states = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
-        dones = torch.as_tensor(dones, dtype=torch.float32, device=self.device).unsqueeze(-1)
+        states = torch.FloatTensor(states).to(self.device)
+        actions = torch.FloatTensor(actions).to(self.device)
+        rewards = torch.FloatTensor(rewards).to(self.device).unsqueeze(-1)
+        next_states = torch.FloatTensor(next_states).to(self.device)
+        dones = torch.FloatTensor(dones).to(self.device).unsqueeze(-1)
 
         # Обновление Critic
         with torch.no_grad():

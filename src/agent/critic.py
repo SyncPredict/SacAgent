@@ -2,26 +2,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class Critic(nn.Module):
-    """
-    Критическая сеть для SAC агента, оценивающая Q-значение пар состояние-действие.
-
-    Атрибуты:
-        state_dim (int): Размерность входного вектора состояния.
-        action_dim (int): Размерность вектора действий.
-        hidden_dim (int): Размер скрытых слоев.
-    """
     def __init__(self, state_dim, action_dim, hidden_dim):
-        """
-        Инициализация критика.
-
-        Аргументы:
-            state_dim (int): Размерность входного вектора состояния.
-            action_dim (int): Размерность вектора действий.
-            hidden_dim (int): Размер скрытых слоев.
-        """
         super(Critic, self).__init__()
-        self.layer1 = nn.Sequential(nn.Linear(state_dim + action_dim, hidden_dim),
+        # Добавление LSTM слоя для обработки временных последовательностей
+        self.lstm = nn.LSTM(input_size=state_dim, hidden_size=hidden_dim, batch_first=True)
+
+        # Изменение входной размерности первого слоя для соответствия выходу LSTM и размеру действия
+        self.layer1 = nn.Sequential(nn.Linear(hidden_dim + action_dim, hidden_dim),
                                     nn.LayerNorm(hidden_dim),
                                     nn.ReLU())
         self.layer2 = nn.Sequential(nn.Linear(hidden_dim, hidden_dim),
@@ -30,21 +19,17 @@ class Critic(nn.Module):
         self.layer3 = nn.Linear(hidden_dim, 1)
 
     def forward(self, state, action):
-        """
-        Прямой проход критика.
+        # Обработка временного ряда через LSTM
+        state, _ = self.lstm(state)
+        # Выбор последнего скрытого состояния для дальнейшей обработки
+        state = state[:, -1, :]
+        sa = torch.cat([state, action], -1)
 
-        Аргументы:
-            state (torch.Tensor): Тензор состояния.
-            action (torch.Tensor): Тензор действия.
-
-        Возвращает:
-            torch.Tensor: Q-значение для пары состояние-действие.
-        """
-        sa = torch.cat([state, action], 1)
         x = self.layer1(sa)
         x = self.layer2(x)
         q_value = self.layer3(x)
         return q_value
+
 
 class CriticNetworks:
     """

@@ -96,16 +96,28 @@ class Agent(SACAgent):
         | 2021-01-02 |    0.6   |    15    |
         """
         actions, dates, rewards = [], [], []
+        # update_rewards = []
         state = env.reset()
         max_timesteps = len(env)
         for timestep in range(max_timesteps):
-            action = self.select_action(state)
+            state_with_batch = state[np.newaxis, :, :]
+            action = self.select_action(state_with_batch)
             next_state, reward, done, date = env.step(action)
             if not np.isnan(reward) and train:
                 self.replay_buffer.add((state, action, next_state, reward, float(done)))  # Добавление в буфер
             actions.append(action)
             rewards.append(reward)
             dates.append(date)
+
+            # update_rewards.append(reward)
+
+            # if (len(self.replay_buffer) == self.replay_buffer.size or done) and train:
+            #     self.update_parameters(self.replay_buffer, self.batch_size)
+            #     self.replay_buffer.reset()
+            #     wandb.log({
+            #         'Step reward': sum(update_rewards),
+            #     })
+            # update_rewards = []
 
             state = next_state
             print_progress(timestep, max_timesteps, episode, episodes, reward)

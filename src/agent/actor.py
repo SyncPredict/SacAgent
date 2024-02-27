@@ -103,17 +103,6 @@ class Actor(nn.Module):
         return mean, log_std
 
     def sample(self, state):
-        """
-        Генерация действия на основе текущего состояния.
-
-        Параметры:
-            state (torch.Tensor): Входной тензор состояний размерности (N, seq_length, features),
-                                  где N - размер батча, seq_length - длина последовательности, features - количество признаков состояния.
-
-        Возвращает:
-            action (torch.Tensor): Тензор действий, выбранных для последнего тика в последовательности, размерность (N, action_dim).
-            log_prob (torch.Tensor): Тензор логарифмов вероятностей выбранных действий, размерность (N, 1).
-        """
         mean, log_std = self.forward(state)  # Получаем предсказания для всей последовательности
         std = log_std.exp()
         normal_dist = Normal(mean, std)
@@ -121,9 +110,9 @@ class Actor(nn.Module):
         action = torch.sigmoid(z) * self.max_action  # Применяем сигмоиду для получения действия в диапазоне [0, 1]
 
         # Выбираем последнее действие из последовательности
-        action = action[:, -1, :]  # Предполагается, что размерность action [batch_size, seq_length, action_dim]
+        processed_action = action[:, -1, :]  # Предполагается, что размерность action [batch_size, seq_length, action_dim]
 
         log_prob = normal_dist.log_prob(z) - torch.log(1 - action.pow(2) + 1e-6)
         log_prob = log_prob[:, -1, :].sum(-1, keepdim=True)  # Выбираем лог-вероятности для последнего действия
 
-        return action, log_prob
+        return processed_action, log_prob
