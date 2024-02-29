@@ -12,7 +12,7 @@ wandb.init("sac_train_new")
 replay_buffer_size = 400000  # Размер буффера
 replay_buffer = ReplayBuffer(replay_buffer_size)
 hidden_state_dim = 256
-batch_size = 546
+batch_size = 2160
 window_size = 288
 input_size = 1  # Размерность входных данных (в данном случае это только цена)
 

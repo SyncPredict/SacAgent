@@ -1,3 +1,4 @@
+import gc
 import os
 
 import torch
@@ -11,6 +12,7 @@ from ..utils.dir import find_directory
 
 def clear_memory():
     torch.cuda.empty_cache()
+    gc.collect()
 
 
 class SACAgent:
