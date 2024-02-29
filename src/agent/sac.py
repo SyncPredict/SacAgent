@@ -63,7 +63,7 @@ class SACAgent:
         self.tau = tau
         self.alpha = alpha
 
-    def select_action(self, state):
+    def select_actions(self, state):
         """
         Выбор действия агентом для заданного состояния.
 
@@ -80,9 +80,10 @@ class SACAgent:
         """
         with torch.no_grad():
             state = torch.tensor(state, device=self.device, dtype=torch.float)
-            action, _ = self.actor.sample(state)  # action имеет форму [batch_size, action_dim]
-            action = action.squeeze(0)  # Убираем измерение batch, получаем [action_dim]
-        return action.cpu().numpy()
+            actions, _ = self.actor.sample(state)  # action имеет форму [batch_size, action_dim]
+            actions = actions.squeeze(0)  # Убираем измерение batch, получаем [action_dim]
+
+        return actions.cpu().numpy()
 
     def update_parameters(self, replay_buffer, batch_size):
         """
@@ -100,11 +101,11 @@ class SACAgent:
             - dones: torch.Tensor, формат (batch_size, 1)
         """
         states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
-        states = torch.FloatTensor(states, device=self.device)
-        actions = torch.FloatTensor(actions, device=self.device)
-        rewards = torch.FloatTensor(rewards, device=self.device).unsqueeze(-1)
-        next_states = torch.FloatTensor(next_states, device=self.device)
-        dones = torch.FloatTensor(dones, device=self.device).unsqueeze(-1)
+        states = torch.tensor(states, device=self.device, dtype=torch.float)
+        actions = torch.tensor(actions, device=self.device, dtype=torch.float)
+        rewards = torch.tensor(rewards, device=self.device, dtype=torch.float).unsqueeze(-1)
+        next_states = torch.tensor(next_states, device=self.device, dtype=torch.float)
+        dones = torch.tensor(dones, device=self.device, dtype=torch.float).unsqueeze(-1)
 
         # Обновление Critic
         with torch.no_grad():

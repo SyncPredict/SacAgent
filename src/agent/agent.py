@@ -2,7 +2,6 @@ import numpy as np
 import gc  # Импортируем модуль сборщика мусора
 
 import pandas as pd
-import torch
 
 from src.agent.sac import SACAgent, clear_memory
 import wandb
@@ -67,19 +66,13 @@ class Agent(SACAgent):
         """
         new_dir = find_directory(True)
         for episode in range(episodes):
-            episode_data = self._process_episode(env, episode, episodes, train)
-            total_rewards = episode_data["reward"].sum()  # Общая награда за эпизод
+            rewards = self._process_episode(env, episode, episodes, train, self.batch_size)
+            total_rewards = sum(rewards)  # Общая награда за эпизод
             average_reward_per_step = (
-                total_rewards / len(episode_data) if not episode_data.empty else 0
+                total_rewards / len(rewards)
             )  # Средняя награда за шаг
-            positive_rewards_count = (
-                episode_data["reward"] > 0
-            ).sum()  # Количество положительных наград
-            win_rate = (
-                (positive_rewards_count / len(episode_data) * 100)
-                if not episode_data.empty
-                else 0
-            )  # Процент положительных наград
+            positive_rewards_count = sum([1 for reward in rewards if reward > 0])  # Количество положительных наград
+            win_rate = positive_rewards_count / len(rewards) * 100  # Процент положительных наград
 
             # Логирование метрик
             wandb.log(
@@ -98,7 +91,7 @@ class Agent(SACAgent):
             clear_memory()
             gc.collect()
 
-    def _process_episode(self, env: TradingEnv, episode, episodes, train):
+    def _process_episode(self, env: TradingEnv, episode, episodes, train, batch_size):
         """
         Обрабатывает один эпизод, собирая данные о действиях, наградах и датах.
         Возвращает результаты в формате pandas DataFrame, где дата является индексом,
@@ -116,40 +109,29 @@ class Agent(SACAgent):
         | 2021-01-01 |    0.5   |    10    |
         | 2021-01-02 |    0.6   |    15    |
         """
-        actions, dates, rewards = [], [], []
-        # update_rewards = []
-        state = env.reset()
-        max_timesteps = len(env)
-        for timestep in range(max_timesteps):
-            state_with_batch = torch.from_numpy(state[np.newaxis, :, :]).float().to(self.device)
-            action = self.select_action(state_with_batch)
-            next_state, reward, done, date = env.step(action)
-            if not np.isnan(reward) and train:
-                self.replay_buffer.add(
-                    (state, action, next_state, reward, float(done))
-                )  # Добавление в буфер
-            actions.append(action)
-            rewards.append(reward)
-            dates.append(date)
+        states = env.reset()
 
-            # update_rewards.append(reward)
-
-            # if (len(self.replay_buffer) == self.replay_buffer.size or done) and train:
-            #     self.update_parameters(self.replay_buffer, self.batch_size)
-            #     self.replay_buffer.reset()
-            #     wandb.log({
-            #         'Step reward': sum(update_rewards),
-            #     })
-            # update_rewards = []
-
-            state = next_state
-            print_progress(timestep, max_timesteps, episode, episodes, reward)
+        rewards = []
+        done = False
+        while not done:
+            actions = self.select_actions(states)
+            next_states, result, done, _ = env.step(actions)
 
             if done:
                 break
 
-        # Создание DataFrame из собранных данных
-        episode_data = pd.DataFrame(
-            {"action": actions, "reward": rewards}, index=pd.to_datetime(dates)
-        )
-        return episode_data
+            for i in range(len(result)):
+                action, reward = result[i]
+                prev_window = states[i]
+                next_window = next_states[0] if i == len(result) - 1 else states[i + 1]
+                if not np.isnan(reward) and train:
+                    self.replay_buffer.add(
+                        (prev_window, action, next_window, reward, float(done))
+                    )  # Добавление в буфер
+
+                rewards.append(reward)
+
+            states = next_states
+            print_progress(env.current_step, env.max_steps, episode, episodes, sum(rewards))
+
+        return rewards
