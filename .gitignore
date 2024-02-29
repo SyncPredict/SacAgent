@@ -2,5 +2,6 @@ __pycache__
 .conda
 .vscode
 .idea
+.venv
 wandb
 models
