@@ -27,7 +27,17 @@ class SACAgent:
         device (torch.device): Устройство, на котором выполняются вычисления (CPU или GPU).
     """
 
-    def __init__(self, state_dim, action_dim, hidden_dim, lr=3e-4, gamma=0.99, tau=0.005, alpha=0.2, num_heads=4):
+    def __init__(
+        self,
+        state_dim,
+        action_dim,
+        hidden_dim,
+        lr=3e-4,
+        gamma=0.99,
+        tau=0.005,
+        alpha=0.2,
+        num_heads=4,
+    ):
         """
         Инициализация агента SAC с заданными параметрами сети и обучения.
 
@@ -40,7 +50,11 @@ class SACAgent:
             tau (float): Коэффициент мягкого обновления целевых сетей.
             alpha (float): Коэффициент, определяющий важность энтропийного бонуса.
         """
-        self.device = torch.device("cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # Устанавливаем устройство по умолчанию для PyTorch
+        torch.set_default_device(self.device)
+
         self.actor = Actor(state_dim, action_dim, hidden_dim, num_heads, self.device)
         self.critic_networks = CriticNetworks(state_dim, action_dim, hidden_dim)
 
@@ -49,7 +63,7 @@ class SACAgent:
         self.tau = tau
         self.alpha = alpha
 
-    def select_action(self, state):
+    def select_actions(self, state):
         """
         Выбор действия агентом для заданного состояния.
 
@@ -65,10 +79,11 @@ class SACAgent:
             action = agent.select_action(state)  # Например, np.array([0.5, -0.1])
         """
         with torch.no_grad():
-            state = torch.FloatTensor(state).to(self.device)
-            action, _ = self.actor.sample(state)  # action имеет форму [1, action_dim]
-            action = action.squeeze(0)  # Убираем измерение batch, получаем [action_dim]
-        return action.cpu().numpy()
+            state = torch.tensor(state, device=self.device, dtype=torch.float)
+            actions, _ = self.actor.sample(state)  # action имеет форму [batch_size, action_dim]
+            actions = actions.squeeze(0)  # Убираем измерение batch, получаем [action_dim]
+
+        return actions.cpu().numpy()
 
     def update_parameters(self, replay_buffer, batch_size):
         """
@@ -86,17 +101,21 @@ class SACAgent:
             - dones: torch.Tensor, формат (batch_size, 1)
         """
         states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.FloatTensor(actions).to(self.device)
-        rewards = torch.FloatTensor(rewards).to(self.device).unsqueeze(-1)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        dones = torch.FloatTensor(dones).to(self.device).unsqueeze(-1)
+        states = torch.tensor(states, device=self.device, dtype=torch.float)
+        actions = torch.tensor(actions, device=self.device, dtype=torch.float)
+        rewards = torch.tensor(rewards, device=self.device, dtype=torch.float).unsqueeze(-1)
+        next_states = torch.tensor(next_states, device=self.device, dtype=torch.float)
+        dones = torch.tensor(dones, device=self.device, dtype=torch.float).unsqueeze(-1)
 
         # Обновление Critic
         with torch.no_grad():
             next_actions, next_log_pi = self.actor.sample(next_states)
-            q_target_next_1, q_target_next_2 = self.critic_networks.target_predict(next_states, next_actions)
-            min_q_target_next = torch.min(q_target_next_1, q_target_next_2) - self.alpha * next_log_pi
+            q_target_next_1, q_target_next_2 = self.critic_networks.target_predict(
+                next_states, next_actions
+            )
+            min_q_target_next = (
+                torch.min(q_target_next_1, q_target_next_2) - self.alpha * next_log_pi
+            )
             q_target = rewards + self.gamma * (1 - dones) * min_q_target_next
 
         current_q1, current_q2 = self.critic_networks.predict(states, actions)
@@ -136,18 +155,21 @@ class SACAgent:
             name (str): Имя файла для сохранения состояния модели.
         """
         # Обновляем путь для сохранения, используя имя файла
-        save_path = os.path.join(new_dir, f'{name}.pth')
+        save_path = os.path.join(new_dir, f"{name}.pth")
 
         # Сохраняем состояние модели
-        torch.save({
-            'actor_state_dict': self.actor.state_dict(),
-            'critic_networks_state_dict': self.critic_networks.state_dict(),
-            'actor_optimizer_state_dict': self.actor_optimizer.state_dict(),
-            'critic_networks_optimizer_1_state_dict': self.critic_networks.optimizer_1.state_dict(),
-            'critic_networks_optimizer_2_state_dict': self.critic_networks.optimizer_2.state_dict()
-        }, save_path)
+        torch.save(
+            {
+                "actor_state_dict": self.actor.state_dict(),
+                "critic_networks_state_dict": self.critic_networks.state_dict(),
+                "actor_optimizer_state_dict": self.actor_optimizer.state_dict(),
+                "critic_networks_optimizer_1_state_dict": self.critic_networks.optimizer_1.state_dict(),
+                "critic_networks_optimizer_2_state_dict": self.critic_networks.optimizer_2.state_dict(),
+            },
+            save_path,
+        )
 
-    def load_model(self, path, device='cpu'):
+    def load_model(self, path, device="cpu"):
         """
         Загружает модель агента из файла.
 
@@ -156,8 +178,12 @@ class SACAgent:
             device (str): Устройство, на которое будет загружена модель ('cpu' или 'cuda').
         """
         checkpoint = torch.load(path, map_location=device)
-        self.actor.load_state_dict(checkpoint['actor_state_dict'])
-        self.critic_networks.load_state_dict(checkpoint['critic_networks_state_dict'])
-        self.actor_optimizer.load_state_dict(checkpoint['actor_optimizer_state_dict'])
-        self.critic_networks.optimizer_1.load_state_dict(checkpoint['critic_networks_optimizer_1_state_dict'])
-        self.critic_networks.optimizer_2.load_state_dict(checkpoint['critic_networks_optimizer_2_state_dict'])
+        self.actor.load_state_dict(checkpoint["actor_state_dict"])
+        self.critic_networks.load_state_dict(checkpoint["critic_networks_state_dict"])
+        self.actor_optimizer.load_state_dict(checkpoint["actor_optimizer_state_dict"])
+        self.critic_networks.optimizer_1.load_state_dict(
+            checkpoint["critic_networks_optimizer_1_state_dict"]
+        )
+        self.critic_networks.optimizer_2.load_state_dict(
+            checkpoint["critic_networks_optimizer_2_state_dict"]
+        )

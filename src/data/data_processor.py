@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 class DataProcessor:
     def __init__(self, filepath):
         """
@@ -20,16 +21,17 @@ class DataProcessor:
         """
         # Загрузка данных из файла
         data = pd.read_json(filepath)
+        
         # Преобразование timestamp в datetime
-        data['date'] = pd.to_datetime(data['date'], unit='ms')
+        data["date"] = pd.to_datetime(data["date"], unit="ms")
         return data
 
     def _initial_preprocessing(self):
         """
         Выполняет начальную предобработку данных: устанавливает даты как индексы и интерполирует отсутствующие значения.
         """
-        self.df.set_index('date', inplace=True)
-        self.df = self.df[['rate']].interpolate()
+        self.df.set_index("date", inplace=True)
+        self.df = self.df[["rate"]].interpolate()
 
     def get_episode_data(self, start_index, end_index):
         """
@@ -47,9 +49,11 @@ class DataProcessor:
         относительно предыдущей цены.
         """
         if start_index > 0:
-            episode_rates = self.df.iloc[start_index - 1:end_index]['rate']
+            episode_rates = self.df.iloc[start_index - 1 : end_index]["rate"]
             processed_episode = episode_rates.pct_change().dropna().to_numpy()
-            processed_episode = np.expand_dims(processed_episode, axis=-1)  # Изменение формы массива
+            processed_episode = np.expand_dims(
+                processed_episode, axis=-1
+            )  # Изменение формы массива
             return processed_episode
         else:
             raise ValueError("start_index должен быть больше 0")
@@ -62,7 +66,7 @@ class DataProcessor:
         :return: строковое представление даты и времени
         """
         datetime = self.df.index[index]
-        return datetime.strftime('%Y-%m-%d %H:%M:%S')
+        return datetime.strftime("%Y-%m-%d %H:%M:%S")
 
     def get_price(self, index):
         """
@@ -71,7 +75,7 @@ class DataProcessor:
         :param index: индекс элемента
         :return: значение цены
         """
-        current_rate = self.df.iloc[index]['rate']
+        current_rate = self.df.iloc[index]["rate"]
         return current_rate
 
     def execute_trading_decision(self, index, stop_loss, take_profit):
@@ -83,11 +87,11 @@ class DataProcessor:
         :param take_profit: значение тейк-профита в процентах
         :return: цена на момент срабатывания условия или -10000, если условие не сработало
         """
-        initial_price = self.df.iloc[index]['rate']
+        initial_price = self.df.iloc[index]["rate"]
         lower_bound = initial_price - initial_price * stop_loss / 100
         upper_bound = initial_price + initial_price * take_profit / 100
 
-        for price in self.df.iloc[index:]['rate']:
+        for price in self.df.iloc[index:]["rate"]:
             if price <= lower_bound or price >= upper_bound:
                 return price
         return -10000
@@ -99,4 +103,3 @@ class DataProcessor:
         :return: количество элементов в датафрейме
         """
         return len(self.df)
-

@@ -2,6 +2,8 @@ import gym
 from gym import spaces
 import numpy as np
 
+from src.data.data_processor import DataProcessor
+
 
 class TradingEnv(gym.Env):
     """
@@ -17,7 +19,7 @@ class TradingEnv(gym.Env):
         current_step (int): Текущий шаг в рамках эпизода.
     """
 
-    def __init__(self, data_processor, window_size=288):
+    def __init__(self, data_processor: DataProcessor, window_size=288, batch_size=1095):
         """
         Инициализирует среду торговли фьючерсами Bitcoin.
 
@@ -29,17 +31,24 @@ class TradingEnv(gym.Env):
         self.current_step = None
         self.data_processor = data_processor
         self.window_size = window_size
+        self.batch_size = batch_size
         self.action_space = spaces.Box(
             low=np.array([0, 0], dtype=np.float32),
             high=np.array([1, 1], dtype=np.float32),
-            dtype=np.float32
+            dtype=np.float32,
         )
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(window_size,),
-                                            dtype=np.float32)
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(window_size,), dtype=np.float32
+        )
+
         self.reset()
 
+    @property
+    def max_steps(self):
+        return len(self.data_processor) // self.batch_size
+
     def __len__(self):
-        return len(self.data_processor) - self.window_size
+        return len(self.data_processor)
 
     def reset(self):
         """
@@ -50,7 +59,7 @@ class TradingEnv(gym.Env):
         :return: Начальное наблюдение среды - массив процентных изменений цен за последние window_size шагов,
                  рассчитанный начиная с элемента перед первым шагом в окне наблюдения.
         """
-        self.current_step = self.window_size + 1
+        self.current_step = 0 # для каждого батча
         self.done = False
         return self._next_observation()
 
@@ -64,8 +73,25 @@ class TradingEnv(gym.Env):
                  Пример возвращаемого значения для window_size=3: np.array([0.1, -0.0909, 0.0333]), где каждое значение отражает изменение
                  цены относительно предыдущего значения в последовательности.
         """
-        obs = self.data_processor.get_episode_data(self.current_step - self.window_size, self.current_step)
-        return obs
+        # Получаем первый батч из датафрейма. Батч состоит из массивов с window_size элементами с шагом 1
+        result = []
+        end_range = self.batch_size * (self.current_step + 1)
+        start_index = 1 if self.current_step == 0 else end_range - self.batch_size
+        end_index = -1
+        while start_index <= end_range:
+            end_index = start_index + self.window_size
+
+            if end_index > len(self.data_processor):
+                break
+
+            obs = self.data_processor.get_episode_data(start_index, end_index)
+            start_index += 1
+            
+            result.append(obs)
+
+        result = np.array(result)
+
+        return result # массив окон с шагом 1 и размером в window_size
 
     def _take_action(self, action, current_price):
         """
@@ -79,13 +105,15 @@ class TradingEnv(gym.Env):
                  Возвращает NaN, если условия не были достигнуты.
         """
         stop_loss, take_profit = action
-        result_price = self.data_processor.execute_trading_decision(self.current_step, stop_loss, take_profit)
+        result_price = self.data_processor.execute_trading_decision(
+            self.current_step, stop_loss, take_profit
+        )
         if result_price == -10000:
-            return float('nan')
+            return float("nan")
         percentage_change = (result_price - current_price) / current_price
         return percentage_change
 
-    def step(self, action):
+    def step(self, actions):
         """
         Выполняет шаг в среде, применяя действие, выбранное агентом, и возвращает результат этого действия в виде нового наблюдения,
         награды, индикатора завершения эпизода и дополнительной информации.
@@ -94,13 +122,16 @@ class TradingEnv(gym.Env):
         :return: Кортеж, содержащий следующее наблюдение (массив процентных изменений цен), награду (процентное изменение цены),
                  флаг завершения эпизода и дополнительную информацию (текущую дату и время).
         """
-        current_price = self.data_processor.get_price(self.current_step)
-        current_date = self.data_processor.get_datetime(self.current_step)
+
+        result = []
+
+        for action in actions:
+            current_price = self.data_processor.get_price(self.current_step)
+            reward = self._take_action(action, current_price)
+            result.append((action, reward))
+
         self.current_step += 1
-
-        reward = self._take_action(action, current_price)
-
-        self.done = self.current_step >= len(self)
-
+        self.done = self.current_step >= len(self.data_processor) // self.batch_size
+        
         obs = self._next_observation()
-        return obs, reward, self.done, current_date
+        return obs, result, self.done, None

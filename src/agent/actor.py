@@ -16,36 +16,54 @@ class MultiHeadAttention(nn.Module):
         self.head_dim = hidden_dim // num_heads
 
         assert (
-                self.head_dim * num_heads == hidden_dim
+            self.head_dim * num_heads == hidden_dim
         ), "hidden_dim must be divisible by num_heads"
 
-        self.query = nn.Linear(hidden_dim, hidden_dim)
-        self.key = nn.Linear(hidden_dim, hidden_dim)
-        self.value = nn.Linear(hidden_dim, hidden_dim)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.softmax = nn.Softmax(dim=-1)
-        self.fc_out = nn.Linear(hidden_dim, hidden_dim)
+        self.query = nn.Linear(hidden_dim, hidden_dim, device=self.device)
+        self.key = nn.Linear(hidden_dim, hidden_dim, device=self.device)
+        self.value = nn.Linear(hidden_dim, hidden_dim, device=self.device)
+
+        self.softmax = nn.Softmax(dim=-1).to(self.device)
+        self.fc_out = nn.Linear(hidden_dim, hidden_dim, device=self.device)
 
     def forward(self, x):
         """
-            Прямой проход многоголовочного механизма внимания.
+        Прямой проход многоголовочного механизма внимания.
 
-            Параметры:
-                x (torch.Tensor): Входной тензор размерности (N, seq_length, hidden_dim),
-                                  где N - размер батча, seq_length - длина последовательности, hidden_dim - размер скрытого слоя.
+        Параметры:
+            x (torch.Tensor): Входной тензор размерности (N, seq_length, hidden_dim),
+                              где N - размер батча, seq_length - длина последовательности, hidden_dim - размер скрытого слоя.
 
-            Возвращает:
-                torch.Tensor: Тензор после применения механизма внимания и последующего линейного слоя,
-                              размерность (N, seq_length, hidden_dim).
-            """
+        Возвращает:
+            torch.Tensor: Тензор после применения механизма внимания и последующего линейного слоя,
+                          размерность (N, seq_length, hidden_dim).
+        """
         N, seq_length, _ = x.size()
-        query = self.query(x).view(N, seq_length, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
-        key = self.key(x).view(N, seq_length, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
-        value = self.value(x).view(N, seq_length, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        query = (
+            self.query(x)
+            .view(N, seq_length, self.num_heads, self.head_dim)
+            .permute(0, 2, 1, 3)
+        )
+        key = (
+            self.key(x)
+            .view(N, seq_length, self.num_heads, self.head_dim)
+            .permute(0, 2, 1, 3)
+        )
+        value = (
+            self.value(x)
+            .view(N, seq_length, self.num_heads, self.head_dim)
+            .permute(0, 2, 1, 3)
+        )
 
-        energy = torch.matmul(query, key.permute(0, 1, 3, 2)) / self.head_dim ** 0.5
+        energy = torch.matmul(query, key.permute(0, 1, 3, 2)) / self.head_dim**0.5
         attention = self.softmax(energy)
-        out = torch.matmul(attention, value).permute(0, 2, 1, 3).reshape(N, seq_length, self.hidden_dim)
+        out = (
+            torch.matmul(attention, value)
+            .permute(0, 2, 1, 3)
+            .reshape(N, seq_length, self.hidden_dim)
+        )
         return self.fc_out(out)
 
 
@@ -68,16 +86,18 @@ class Actor(nn.Module):
         sample(state): Генерирует действие из нормального распределения, заданного параметрами, полученными из forward.
     """
 
-    def __init__(self, state_dim, action_dim, hidden_dim, num_heads,device):
+    def __init__(self, state_dim, action_dim, hidden_dim, num_heads, device):
         super(Actor, self).__init__()
         self.device = device
-        self.lstm = nn.LSTM(input_size=state_dim, hidden_size=hidden_dim, batch_first=True).to(self.device)
-        self.attention = MultiHeadAttention(hidden_dim, num_heads)
-        self.layer_norm1 = nn.LayerNorm(hidden_dim)
-        self.fc1 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer_norm2 = nn.LayerNorm(hidden_dim)
-        self.mean_layer = nn.Linear(hidden_dim, action_dim)
-        self.log_std_layer = nn.Linear(hidden_dim, action_dim)
+        self.lstm = nn.LSTM(
+            input_size=state_dim, hidden_size=hidden_dim, batch_first=True, device=self.device
+        )
+        self.attention = MultiHeadAttention(hidden_dim, num_heads).to(self.device)
+        self.layer_norm1 = nn.LayerNorm(hidden_dim, device=self.device)
+        self.fc1 = nn.Linear(hidden_dim, hidden_dim, device=self.device)
+        self.layer_norm2 = nn.LayerNorm(hidden_dim, device=self.device)
+        self.mean_layer = nn.Linear(hidden_dim, action_dim, device=self.device)
+        self.log_std_layer = nn.Linear(hidden_dim, action_dim, device=self.device)
         self.max_action = 1.0
 
     def forward(self, state):
@@ -104,16 +124,24 @@ class Actor(nn.Module):
         return mean, log_std
 
     def sample(self, state):
-        mean, log_std = self.forward(state)  # Получаем предсказания для всей последовательности
+        mean, log_std = self.forward(
+            state
+        )  # Получаем предсказания для всей последовательности
         std = log_std.exp()
         normal_dist = Normal(mean, std)
         z = normal_dist.rsample()
-        action = torch.sigmoid(z) * self.max_action  # Применяем сигмоиду для получения действия в диапазоне [0, 1]
+        action = (
+            torch.sigmoid(z) * self.max_action
+        )  # Применяем сигмоиду для получения действия в диапазоне [0, 1]
 
         # Выбираем последнее действие из последовательности
-        processed_action = action[:, -1, :]  # Предполагается, что размерность action [batch_size, seq_length, action_dim]
+        processed_action = action[
+            :, -1, :
+        ]  # Предполагается, что размерность action [batch_size, seq_length, action_dim]
 
         log_prob = normal_dist.log_prob(z) - torch.log(1 - action.pow(2) + 1e-6)
-        log_prob = log_prob[:, -1, :].sum(-1, keepdim=True)  # Выбираем лог-вероятности для последнего действия
+        log_prob = log_prob[:, -1, :].sum(
+            -1, keepdim=True
+        )  # Выбираем лог-вероятности для последнего действия
 
         return processed_action, log_prob
