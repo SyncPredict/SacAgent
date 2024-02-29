@@ -19,6 +19,8 @@ input_size = 1  # Размерность входных данных (в дан�
 model_path = find_directory()
 processor = DataProcessor("data.json")
 agent = Agent(input_size, 2, hidden_state_dim, replay_buffer, batch_size)
+agent.load_model(model_path, device="cuda")
+
 env = TradingEnv(processor, window_size, batch_size)
 agent.execute_episodes(env, 10000, True)
 
