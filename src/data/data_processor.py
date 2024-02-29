@@ -21,7 +21,7 @@ class DataProcessor:
         """
         # Загрузка данных из файла
         data = pd.read_json(filepath)
-        
+        # data = data[:int(len(data) * 0.01)]
         # Преобразование timestamp в datetime
         data["date"] = pd.to_datetime(data["date"], unit="ms")
         return data

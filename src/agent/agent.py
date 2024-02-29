@@ -1,5 +1,4 @@
 import numpy as np
-import gc  # Импортируем модуль сборщика мусора
 
 import pandas as pd
 
@@ -84,12 +83,12 @@ class Agent(SACAgent):
             )
 
             if train:
+                clear_memory()
                 self.update_parameters(self.replay_buffer, self.batch_size)
                 self.replay_buffer.reset()
                 self.save_model(new_dir, f"episode_{episode}")
 
             clear_memory()
-            gc.collect()
 
     def _process_episode(self, env: TradingEnv, episode, episodes, train, batch_size):
         """
